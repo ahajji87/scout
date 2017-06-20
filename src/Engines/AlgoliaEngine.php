@@ -74,7 +74,7 @@ class AlgoliaEngine extends Engine
     public function search(Builder $builder)
     {
         return $this->performSearch($builder, array_filter([
-            'numericFilters' => $this->filters($builder),
+            'facetFilters' => $this->filters($builder),
             'hitsPerPage' => $builder->limit,
         ]));
     }
@@ -105,6 +105,8 @@ class AlgoliaEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
+        $options = $this->mergeLocation($builder, $options);
+
         $algolia = $this->algolia->initIndex(
             $builder->index ?: $builder->model->searchableAs()
         );
@@ -130,7 +132,7 @@ class AlgoliaEngine extends Engine
     protected function filters(Builder $builder)
     {
         return collect($builder->wheres)->map(function ($value, $key) {
-            return $key.'='.$value;
+            return $key.':'.$value;
         })->values()->all();
     }
 
@@ -167,8 +169,10 @@ class AlgoliaEngine extends Engine
 
         return Collection::make($results['hits'])->map(function ($hit) use ($model, $models) {
             $key = $hit['objectID'];
-
             if (isset($models[$key])) {
+                if (isset($hit['_rankingInfo'])) {
+                    $models[$key]->setDistance($hit['_rankingInfo']['matchedGeoLocation']['distance']);
+                }
                 return $models[$key];
             }
         })->filter();
@@ -183,5 +187,21 @@ class AlgoliaEngine extends Engine
     public function getTotalCount($results)
     {
         return $results['nbHits'];
+    }
+
+    /**
+     * Merge location data with options array to pass to Algolia.
+     *
+     * @param \Laravel\Scout\Builder $builder
+     * @param array $options
+     * @return array
+     */
+    private function mergeLocation(Builder $builder, array $options)
+    {
+        return empty(array_filter($builder->location)) ? $options : array_merge($options, [
+            'aroundLatLng' => $builder->location['lat'] . ',' . $builder->location['lng'],
+            'aroundRadius' => $builder->location['radius'], // Algolia requires metres to be passed
+            'getRankingInfo' => 1
+        ]);
     }
 }

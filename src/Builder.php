@@ -3,14 +3,11 @@
 namespace Laravel\Scout;
 
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Traits\Macroable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class Builder
 {
-    use Macroable;
-
     /**
      * The model instance.
      *
@@ -60,6 +57,8 @@ class Builder
      */
     public $orders = [];
 
+    public $location = [];
+
     /**
      * Create a new search builder instance.
      *
@@ -84,6 +83,21 @@ class Builder
     public function within($index)
     {
         $this->index = $index;
+
+        return $this;
+    }
+
+    /**
+     * Add location constraint to the query
+     *
+     * @param float $lat
+     * @param float $lng
+     * @param int $radius Radius in km
+     * @return $this
+     */
+    public function withinLocation($lat, $lng, $radius = 5000)
+    {
+        $this->location = compact('lat', 'lng', 'radius');
 
         return $this;
     }
@@ -133,16 +147,6 @@ class Builder
     }
 
     /**
-     * Get the raw results of the search.
-     *
-     * @return mixed
-     */
-    public function raw()
-    {
-        return $this->engine()->search($this);
-    }
-
-    /**
      * Get the keys of search results.
      *
      * @return \Illuminate\Support\Collection
@@ -171,6 +175,7 @@ class Builder
     {
         return $this->engine()->get($this);
     }
+
 
     /**
      * Paginate the given query into a simple paginator.
